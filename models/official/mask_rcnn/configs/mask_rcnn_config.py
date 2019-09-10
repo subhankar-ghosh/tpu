@@ -17,7 +17,7 @@
 MASK_RCNN_CFG = {
     # runtime parameters
     'transpose_input': True,
-    'iterations_per_loop': 2500,
+    'iterations_per_loop': 100,
     'num_cores': 8,
     'use_tpu': True,
     # input preprocessing parameters
@@ -85,30 +85,30 @@ MASK_RCNN_CFG = {
     # l2 regularization weight.
     'l2_weight_decay': 1e-4,
     # ---------- Training configurations ----------
-    'train_batch_size': 64,
+    'train_batch_size': 8,
     'learning_rate_type': 'step',  # 'step' or 'cosine'.
     'init_learning_rate': 0.08,
     'warmup_learning_rate': 0.0067,
     'warmup_steps': 500,
     'learning_rate_levels': [0.008, 0.0008],
     'learning_rate_steps': [15000, 20000],
-    'total_steps': 22500,
-    'training_file_pattern': '',
+    'total_steps': 5000,
+    'training_file_pattern': 'gs://yujungc_vm19/coco/train-*',
     # ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
     # 'resnet200'] for resnet backbone.
     # ['mnasnet-a1', 'mnasnet-b1', 'mnasnet-small'] for mnasnet backbone.
     'backbone': 'resnet50',
-    'checkpoint': '',
+    'checkpoint': 'gs://cloud-tpu-artifacts/resnet/resnet-nhwc-2018-02-07/model.ckpt-112603',
     # Optional string filepath to a checkpoint to warm-start from. By default
     # all variables are warm-started, and it is assumed that vocabularies and
     # `tf.Tensor` names are unchanged. One can use the
     # `skip_checkpoint_variables` to skip some variables.
     'warm_start_path': '',
     # TPU performance optimization.
-    'precision': 'bfloat16',
+    'precision': 'float32',
     'conv0_kernel_size': 7,
     'conv0_space_to_depth_block_size': 2,
-    'use_host_call': False,
+    'use_host_call': True,
     # One of ['momentum', 'adam', 'adadelta', 'adagrad', 'rmsprop', 'lars'].
     'optimizer': 'momentum',
     # Gradient clipping is a fairly coarse heuristic to stabilize training.
@@ -128,10 +128,10 @@ MASK_RCNN_CFG = {
     'lars_weight_decay': 1e-4,
     # ---------- Eval configurations ----------
     'eval_batch_size': 8,
-    'num_steps_per_eval': 2500,
-    'eval_samples': 5000,
-    'validation_file_pattern': '',
-    'val_json_file': '',
+    'num_steps_per_eval': 500,
+    'eval_samples': 500,
+    'validation_file_pattern': 'gs://yujungc_vm19/coco/val-*',
+    'val_json_file': 'gs://yujungc_vm19/coco/raw-data/annotations/instances_val2017.json',
     # If `val_json_file` is not provided, one can also read groundtruth
     # from input by setting `include_groundtruth_in_features`:True.
     'include_groundtruth_in_features': False,

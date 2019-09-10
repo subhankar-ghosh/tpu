@@ -40,8 +40,8 @@ import roi_ops
 import spatial_transform_ops
 import training_ops
 import sys
-sys.path.append('tpu/models/official/mnasnet')
-import mnasnet_models
+# sys.path.append('tpu/models/official/mnasnet')
+# import mnasnet_models
 
 
 def create_optimizer(learning_rate, params):
@@ -147,20 +147,20 @@ def build_model_graph(features, labels, is_training, params):
       backbone_feats = resnet_fn(
           features['images'],
           (params['is_training_bn'] and is_training))
-  elif 'mnasnet' in params['backbone']:
-    with tf.variable_scope(params['backbone']):
-      _, endpoints = mnasnet_models.build_mnasnet_base(
-          features['images'],
-          params['backbone'],
-          training=(params['is_training_bn'] and is_training),
-          override_params={'use_keras': False})
+  # elif 'mnasnet' in params['backbone']:
+  #   with tf.variable_scope(params['backbone']):
+  #     _, endpoints = mnasnet_models.build_mnasnet_base(
+  #         features['images'],
+  #         params['backbone'],
+  #         training=(params['is_training_bn'] and is_training),
+  #         override_params={'use_keras': False})
 
-      backbone_feats = {
-          2: endpoints['reduction_2'],
-          3: endpoints['reduction_3'],
-          4: endpoints['reduction_4'],
-          5: endpoints['reduction_5'],
-      }
+  #     backbone_feats = {
+  #         2: endpoints['reduction_2'],
+  #         3: endpoints['reduction_3'],
+  #         4: endpoints['reduction_4'],
+  #         5: endpoints['reduction_5'],
+  #     }
   else:
     raise ValueError('Not a valid backbone option: %s' % params['backbone'])
 
@@ -542,7 +542,7 @@ def _model_fn(features, labels, mode, params, variable_filter_fn=None):
     if params['use_host_call']:
       def host_call_fn(global_step, total_loss, total_rpn_loss, rpn_score_loss,
                        rpn_box_loss, total_fast_rcnn_loss, fast_rcnn_class_loss,
-                       fast_rcnn_box_loss, mask_loss, learning_rate):
+                       fast_rcnn_box_loss, mask_loss, learning_rate, l2_regularization_loss):
         """Training host call. Creates scalar summaries for training metrics.
 
         This function is executed on the CPU and should not directly reference
@@ -585,7 +585,7 @@ def _model_fn(features, labels, mode, params, variable_filter_fn=None):
         with (tf.contrib.summary.create_file_writer(
             params['model_dir'],
             max_queue=params['iterations_per_loop']).as_default()):
-          with tf.contrib.summary.always_record_summaries():
+          with tf.contrib.summary.record_summaries_every_n_global_steps(100, global_step):
             tf.contrib.summary.scalar(
                 'total_loss', tf.reduce_mean(total_loss), step=global_step)
             tf.contrib.summary.scalar(
@@ -611,6 +611,9 @@ def _model_fn(features, labels, mode, params, variable_filter_fn=None):
             tf.contrib.summary.scalar(
                 'learning_rate', tf.reduce_mean(learning_rate),
                 step=global_step)
+            tf.contrib.summary.scalar(
+                'l2_regularization_loss', tf.reduce_mean(l2_regularization_loss),
+                step=global_step)
 
             return tf.contrib.summary.all_summary_ops()
 
@@ -629,11 +632,13 @@ def _model_fn(features, labels, mode, params, variable_filter_fn=None):
       fast_rcnn_box_loss_t = tf.reshape(fast_rcnn_box_loss, [1])
       mask_loss_t = tf.reshape(mask_loss, [1])
       learning_rate_t = tf.reshape(learning_rate, [1])
+      l2_regularization_loss = tf.reshape(l2_regularization_loss, [1])
       host_call = (host_call_fn,
                    [global_step_t, total_loss_t, total_rpn_loss_t,
                     rpn_score_loss_t, rpn_box_loss_t, total_fast_rcnn_loss_t,
                     fast_rcnn_class_loss_t, fast_rcnn_box_loss_t,
-                    mask_loss_t, learning_rate_t])
+                    mask_loss_t, learning_rate_t, l2_regularization_loss])
+
   else:
     train_op = None
     scaffold_fn = None
