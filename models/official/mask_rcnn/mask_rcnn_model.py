@@ -39,9 +39,10 @@ import resnet
 import roi_ops
 import spatial_transform_ops
 import training_ops
+
 import sys
-# sys.path.append('tpu/models/official/mnasnet')
-# import mnasnet_models
+sys.path.append('tpu/models/official/mnasnet')
+import mnasnet_models
 
 
 def create_optimizer(learning_rate, params):
@@ -147,20 +148,20 @@ def build_model_graph(features, labels, is_training, params):
       backbone_feats = resnet_fn(
           features['images'],
           (params['is_training_bn'] and is_training))
-  # elif 'mnasnet' in params['backbone']:
-  #   with tf.variable_scope(params['backbone']):
-  #     _, endpoints = mnasnet_models.build_mnasnet_base(
-  #         features['images'],
-  #         params['backbone'],
-  #         training=(params['is_training_bn'] and is_training),
-  #         override_params={'use_keras': False})
+  elif 'mnasnet' in params['backbone']:
+    with tf.variable_scope(params['backbone']):
+      _, endpoints = mnasnet_models.build_mnasnet_base(
+          features['images'],
+          params['backbone'],
+          training=(params['is_training_bn'] and is_training),
+          override_params={'use_keras': False})
 
-  #     backbone_feats = {
-  #         2: endpoints['reduction_2'],
-  #         3: endpoints['reduction_3'],
-  #         4: endpoints['reduction_4'],
-  #         5: endpoints['reduction_5'],
-  #     }
+      backbone_feats = {
+          2: endpoints['reduction_2'],
+          3: endpoints['reduction_3'],
+          4: endpoints['reduction_4'],
+          5: endpoints['reduction_5'],
+      }
   else:
     raise ValueError('Not a valid backbone option: %s' % params['backbone'])
 
@@ -643,15 +644,39 @@ def _model_fn(features, labels, mode, params, variable_filter_fn=None):
     train_op = None
     scaffold_fn = None
 
+  training_hooks = [
+    tf.train.LoggingTensorHook({
+        "step": global_step,
+        "total_loss": total_loss,
+        "rpn_box_loss": rpn_box_loss,
+        "rpn_score_loss": rpn_score_loss,
+        "rpn_total_loss": total_rpn_loss,
+        "fast_rcnn_class_loss": fast_rcnn_class_loss,
+        "fast_rcnn_box_loss": fast_rcnn_box_loss,
+        "fast_rcnn_loss": total_fast_rcnn_loss,
+        "mask_loss": mask_loss,
+        "l2_loss": l2_regularization_loss,
+        "lr": learning_rate
+        },
+        every_n_iter=100
+    )
+  ]
+
   if params['use_tpu']:
     return tf.contrib.tpu.TPUEstimatorSpec(
         mode=mode,
         loss=total_loss,
         train_op=train_op,
         host_call=host_call,
-        scaffold_fn=scaffold_fn)
+        scaffold_fn=scaffold_fn,
+        training_hooks=training_hooks)
+
   return tf.estimator.EstimatorSpec(
-      mode=mode, loss=total_loss, train_op=train_op)
+      mode=mode,
+      loss=total_loss,
+      train_op=train_op,
+      scaffold=scaffold_fn,
+      training_hooks=training_hooks)
 
 
 def mask_rcnn_model_fn(features, labels, mode, params):
